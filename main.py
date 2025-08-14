@@ -1,152 +1,141 @@
-import random
+# main.py
 
-score_team_1 = 0
-score_team_2 = 0
-team_1 = {}
-team_2 = {}
+import copy
+import os
+from data import TEAMS, find_weapon_by_id
+from simulation import simulate_full_round
 
-# --- Definição dos Times e Jogadores (mantida a mesma) ---
-team_acend_2021 = {
-    'name': 'Acend 2021',
-    'players': [
-        {'name': 'cNed', 'role': 'Duelist', 'nationality': 'Turkey', 'aim': 100, 'game_sense': 60, 'clutch': 70},
-        {'name': 'Starxo', 'role': 'Initiator', 'nationality': 'Poland', 'aim': 80, 'game_sense': 80, 'clutch': 60},
-        {'name': 'zeek', 'role': 'Flex', 'nationality': 'Poland', 'aim': 70, 'game_sense': 60, 'clutch': 60},
-        {'name': 'Kiles', 'role': 'Sentinel', 'nationality': 'Spain', 'aim': 60, 'game_sense': 70, 'clutch': 60},
-        {'name': 'BONECOLD', 'role': 'Controller', 'nationality': 'Finland', 'aim': 70, 'game_sense': 80, 'clutch': 60}
-    ]
-}
+WIN_SCORE = 13
+HALF_TIME_ROUND = 12
 
-team_loud_2022 = {
-    'name': 'LOUD 2022',
-    'players': [
-        {'name': 'Less', 'role': 'Sentinel', 'nationality': 'Brazil', 'aim': 80, 'game_sense': 70, 'clutch': 70},
-        {'name': 'Aspas', 'role': 'Duelist', 'nationality': 'Brazil', 'aim': 100, 'game_sense': 60, 'clutch': 60},
-        {'name': 'Sadhak', 'role': 'Flex', 'nationality': 'Argentina', 'aim': 70, 'game_sense': 100, 'clutch': 70},
-        {'name': 'Sacy', 'role': 'Initiator', 'nationality': 'Brazil', 'aim': 80, 'game_sense': 90, 'clutch': 80},
-        {'name': 'Pancada', 'role': 'Controller', 'nationality': 'Brazil', 'aim': 90, 'game_sense': 70, 'clutch': 100}
-    ]
-}
+def clear_screen():
+    """Limpa a tela do console."""
+    os.system('cls' if os.name == 'nt' else 'clear')
 
-team_eg_2023 = {
-    'name': 'Evil Geniuses 2023',
-    'players': [
-        {'name': 'Demon1', 'role': 'Duelist', 'nationality': 'USA', 'aim': 100, 'game_sense': 60, 'clutch': 70},
-        {'name': 'Ethan', 'role': 'Initiator', 'nationality': 'USA', 'aim': 70, 'game_sense': 80, 'clutch': 60},
-        {'name': 'jawgemo', 'role': 'Flex', 'nationality': 'USA', 'aim': 80, 'game_sense': 70, 'clutch': 70},
-        {'name': 'Boostio', 'role': 'Sentinel', 'nationality': 'USA', 'aim': 70, 'game_sense': 90, 'clutch': 60},
-        {'name': 'C0M', 'role': 'Controller', 'nationality': 'USA', 'aim': 60, 'game_sense': 70, 'clutch': 60}
-    ]
-}
+def initialize_team_for_match(team_data):
+    """Prepara a estrutura de um time para a partida, como em a2.ts e a3.ts."""
+    team = copy.deepcopy(team_data)
+    team['score'] = 0
+    for player in team['players']:
+        player['kills'] = 0
+        player['deaths'] = 0
+        player['credits'] = 800
+        player['is_alive'] = True
+        player['weapon'] = find_weapon_by_id('classic')
+    return team
 
-team_edg_2024 = {
-    'name': 'EDward Gaming 2024',
-    'players': [
-        {'name': 'ZmjjKK', 'role': 'Duelist', 'nationality': 'China', 'aim': 100, 'game_sense': 60, 'clutch': 70},
-        {'name': 'nobody', 'role': 'Initiator', 'nationality': 'China', 'aim': 80, 'game_sense': 70, 'clutch': 60},
-        {'name': 'CHICHOO', 'role': 'Flex', 'nationality': 'China', 'aim': 90, 'game_sense': 70, 'clutch': 70},
-        {'name': 'S1Mon', 'role': 'Controller', 'nationality': 'China', 'aim': 80, 'game_sense': 70, 'clutch': 60},
-        {'name': 'Smoggy', 'role': 'Sentinel', 'nationality': 'China', 'aim': 80, 'game_sense': 70, 'clutch': 60}
-    ]
-}
-
-# --- Dicionário para Mapear Opções para Times (com poderes pré-calculados) ---
-# Adicionaremos uma nova chave 'total_power' a cada dicionário de time
-# após a seleção, ou podemos fazer isso na definição.
-# Para manter a clareza, vamos pré-calcular aqui.
-
-def calculate_team_overall_power(team_data):
-    """Calcula o poder total de um time com base na média dos atributos dos jogadores."""
-    total_player_power = sum((p['aim'] + p['game_sense'] + p['clutch']) / 3 for p in team_data['players'])
-    return total_player_power
-
-# Adiciona o 'total_power' aos dicionários de times existentes
-team_acend_2021['total_power'] = calculate_team_overall_power(team_acend_2021)
-team_loud_2022['total_power'] = calculate_team_overall_power(team_loud_2022)
-team_eg_2023['total_power'] = calculate_team_overall_power(team_eg_2023)
-team_edg_2024['total_power'] = calculate_team_overall_power(team_edg_2024)
-
-available_teams_options = {
-    '1': team_acend_2021,
-    '2': team_loud_2022,
-    '3': team_eg_2023,
-    '4': team_edg_2024
-}
-
-# --- Round Calculation Function (mais eficiente agora) ---
-def calculate_round_winner(current_team_1_power, current_team_2_power):
-    global score_team_1
-    global score_team_2
-
-    # team_1_power e team_2_power já são os valores pré-calculados!
-    # Não precisamos mais iterar pelos jogadores aqui.
-
-    luck_factor_1 = random.randint(50, 200)
-    luck_factor_2 = random.randint(50, 200)
-
-    round_score_1 = current_team_1_power + luck_factor_1
-    round_score_2 = current_team_2_power + luck_factor_2
-
-    if round_score_1 > round_score_2:
-        score_team_1 += 1
-    else:
-        score_team_2 += 1
-
-# --- Team Selection ---
-print('Bem-vindo ao Simulador de Valorant!\n')
-
-print('Escolha o primeiro time:')
-for key, team_dict in available_teams_options.items():
-    print(f"{key}. {team_dict['name']}")
-
-while True:
-    choice_team_1_str = input('\nEscolha uma das opcoes: ')
-    if choice_team_1_str in available_teams_options:
-        team_1 = available_teams_options[choice_team_1_str]
-        break
-    else:
-        print('Opcao invalida, tente novamente...')
-
-print('\nAgora escolha o segundo time:')
-for key, team_dict in available_teams_options.items():
-    print(f"{key}. {team_dict['name']}")
-
-while True:
-    choice_team_2_str = input('\nEscolha uma das opcoes: ')
-    if choice_team_2_str in available_teams_options:
-        if available_teams_options[choice_team_2_str]['name'] == team_1['name']:
-            print('Opcao ja escolhida, tente novamente...')
-        else:
-            team_2 = available_teams_options[choice_team_2_str]
-            break
-    else:
-        print('Opcao invalida, tente novamente...')
-
-# --- Main Game Loop ---
-while True:
-    print(f'\n{team_1["name"]} {score_team_1}x{score_team_2} {team_2["name"]}')
-
-    if score_team_1 >= 12 and score_team_2 >= 12 and abs(score_team_1 - score_team_2) < 2:
-        print("\n--- PRORROGAÇÃO ---")
-        while not ((score_team_1 >= 13 and score_team_1 - score_team_2 >= 2) or \
-                   (score_team_2 >= 13 and score_team_2 - score_team_1 >= 2)):
-            
-            print(f'{team_1["name"]} {score_team_1}x{score_team_2} {team_2["name"]}')
-            
-            # Passa o 'total_power' pré-calculado
-            calculate_round_winner(team_1['total_power'], team_2['total_power'])
-            
-            input('Aperte qualquer tecla para o próximo round de prorrogação:')
-        
-    if (score_team_1 >= 13 and score_team_1 - score_team_2 >= 2) or \
-       (score_team_1 == 13 and score_team_2 < 12):
-        print(f'\nFim de jogo! {team_1["name"]} venceu!')
-        break
-    elif (score_team_2 >= 13 and score_team_2 - score_team_1 >= 2) or \
-         (score_team_2 == 13 and score_team_1 < 12):
-        print(f'\nFim de jogo! {team_2["name"]} venceu!')
-        break
+def print_scoreboard(team_a, team_b):
+    """Exibe o placar detalhado com estatísticas dos jogadores."""
+    print("-" * 60)
+    print(f"{'JOGADOR':<20} {'K':<3} {'D':<3} | {'JOGADOR':<20} {'K':<3} {'D':<3}")
+    print(f"{team_a['name']:<27} | {team_b['name']:<27}")
+    print("-" * 60)
     
-    # Passa o 'total_power' pré-calculado
-    calculate_round_winner(team_1['total_power'], team_2['total_power'])
-    input('Aperte qualquer tecla para o próximo round:')
+    for p_a, p_b in zip(team_a['players'], team_b['players']):
+        line_a = f"{p_a['name']:<20} {p_a['kills']:<3} {p_a['deaths']:<3}"
+        line_b = f"{p_b['name']:<20} {p_b['kills']:<3} {p_b['deaths']:<3}"
+        print(f"{line_a} | {line_b}")
+    print("-" * 60)
+
+def check_win_condition(team_a, team_b, is_overtime):
+    """Verifica a condição de vitória, incluindo prorrogação, como em a2.ts."""
+    score_a, score_b = team_a['score'], team_b['score']
+    
+    if is_overtime:
+        if score_a >= score_b + 2:
+            return team_a
+        if score_b >= score_a + 2:
+            return team_b
+    else:
+        if score_a == WIN_SCORE:
+            return team_a
+        if score_b == WIN_SCORE:
+            return team_b
+    return None
+
+def main():
+    """Função principal que executa o simulador de partida."""
+    clear_screen()
+    print('Bem-vindo ao Simulador Avançado de Valorant!\n')
+
+    # --- Seleção de Times ---
+    print('Escolha o primeiro time:')
+    for i, team in enumerate(TEAMS):
+        print(f"{i + 1}. {team['name']}")
+    
+    choice1 = int(input('\nEscolha uma opção: ')) - 1
+    team_a_data = TEAMS[choice1]
+
+    print('\nAgora escolha o segundo time:')
+    available_teams = [t for t in TEAMS if t['id'] != team_a_data['id']]
+    for i, team in enumerate(available_teams):
+        print(f"{i + 1}. {team['name']}")
+        
+    choice2 = int(input('\nEscolha uma opção: ')) - 1
+    team_b_data = available_teams[choice2]
+
+    # --- Inicialização da Partida ---
+    team_a = initialize_team_for_match(team_a_data)
+    team_b = initialize_team_for_match(team_b_data)
+    round_number = 1
+    is_overtime = False
+    match_winner = None
+    
+    # --- Loop da Partida ---
+    while not match_winner:
+        clear_screen()
+        
+        # Checa se entrou em prorrogação
+        if not is_overtime and team_a['score'] == WIN_SCORE - 1 and team_b['score'] == WIN_SCORE - 1:
+            is_overtime = True
+
+        ot_status = "| PRORROGAÇÃO" if is_overtime else ""
+        print(f"--- Round {round_number} {ot_status} ---")
+        print(f"{team_a['name']} {team_a['score']} x {team_b['score']} {team_b['name']}\n")
+        
+        print_scoreboard(team_a, team_b)
+
+        # --- Controles da Simulação ---
+        print("\nOpções:")
+        print("[1] Simular Próximo Round")
+        print("[2] Simular Partida até o Fim (Fast Simulate)")
+        action = input("Escolha uma ação: ")
+
+        if action == '1': # Simular um round
+            team_a, team_b, winner, kill_feed = simulate_full_round(team_a, team_b)
+            print("\nKill Feed do Round:")
+            for kill in kill_feed:
+                print(f" > {kill}")
+            
+            winner_name = team_a['name'] if winner == 'teamA' else team_b['name']
+            print(f"\n>> {winner_name} venceu o round! <<")
+            input("\nPressione Enter para continuar...")
+
+        elif action == '2': # Simular tudo
+            while not match_winner:
+                team_a, team_b, _, _ = simulate_full_round(team_a, team_b)
+                if not is_overtime and team_a['score'] == WIN_SCORE - 1 and team_b['score'] == WIN_SCORE - 1:
+                    is_overtime = True
+                match_winner = check_win_condition(team_a, team_b, is_overtime)
+            continue # Pula para o fim do loop para exibir o resultado final
+        
+        else:
+            print("Ação inválida.")
+            input("\nPressione Enter para tentar novamente...")
+            continue
+
+        round_number += 1
+        match_winner = check_win_condition(team_a, team_b, is_overtime)
+        
+    # --- Fim de Jogo ---
+    clear_screen()
+    print("=" * 25)
+    print("    FIM DE JOGO!")
+    print("=" * 25)
+    print(f"\n{match_winner['name']} venceu a partida!\n")
+    print(f"Placar Final: {team_a['name']} {team_a['score']} x {team_b['score']} {team_b['name']}\n")
+    print_scoreboard(team_a, team_b)
+
+
+if __name__ == '__main__':
+    main()
